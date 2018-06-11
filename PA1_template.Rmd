@@ -4,22 +4,95 @@ output:
   html_document:
     keep_md: true
 ---
+### Setup
+```{r}
+rm(list=ls())
+library(readr)
+library(ggplot2)
+library(lattice)
+library(knitr)
+options(scipen = 1, digits = 2)
+```
+
+### Loading and preprocessing the data
+```{r}
+raw_data=read.csv(unzip("activity.zip"))
+raw_data$interval<-factor(raw_data$interval, levels=unique(raw_data$interval))
+df<-raw_data[complete.cases(raw_data),]
+
+```
 
 
-## Loading and preprocessing the data
+### Mean total number of steps taken per day
+```{r}
+total_per_day<-aggregate(x=df$steps, by = list(df$date), sum)
+hist(total_per_day$x, main="Mean Total Steps per Day",xlab="Steps per day",col="grey")
+```
+###Medium and Mean
+```{r}
+rmean <- mean(total_per_day$x)
+rmed<- median(total_per_day$x)
+```
+
+The MEAN is **`r rmean`**, and MEDIUM is **`r rmed`**
+
+### The average daily activity pattern?
+``` {r}
+steps_per_interval<-aggregate(x=df$steps, by = list(df$interval), mean)
+plot(steps_per_interval$Group.1, steps_per_interval$x, type="l", xlab= "Interval", ylab="Steps", main="Average Number of Steps per Day by Interval")
+lines(steps_per_interval$Group.1, steps_per_interval$x, type="l")
+```
+
+### The 5-minute interval containing the maximum number of steps?
+```{r}
+total_per_interval<-aggregate(x=df$steps, by = list(df$interval), sum)
+max_steps<-total_per_interval[which.max((total_per_interval$x)),1] 
+
+```
+
+The Interval with Maximum steps is **`r max_steps`**
+
+### Imputing missing values
 
 
 
-## What is mean total number of steps taken per day?
+```{r}
+na_rows<-raw_data[is.na(raw_data$steps),]    
+
+```
+
+The total number of rows with NAs is **`r nrow(na_rows)`**
+
+```{r}
+#Update missing values with Category-Mean
+#-calculate mean for each category, ignoring missing values
+lookup_table <- tapply(raw_data$steps, raw_data$interval, mean, na.rm=TRUE) 
+#-get the index of the missing values
+na_position<-which(is.na(raw_data$steps))
+#-newdata with NAs replaced by interval mean
+new_data<-raw_data 
+new_data$steps[na_position]<- lookup_table[raw_data$interval[na_position]] #using index on the lookup_table to acquire appropriate mean and update the missingh values!
+
+#-Histogram of the total number of steps taken each day
+new_total_per_day<-aggregate(x=new_data$steps, by = list(new_data$date), sum)
+hist(new_total_per_day$x, main="Mean Total Steps per Day",xlab="Steps",col="darkgreen")
+
+```
+```{r}
+#- Mean and Medium
+new_mean<-mean(new_total_per_day$x)
+new_median<-median(new_total_per_day$x)
+```
+The imputed mean is **`r new_mean`**
+The imputed median is **`r new_median`**
 
 
+### Activity patterns between weekdays and weekends?
 
-## What is the average daily activity pattern?
+```{r}
+new_data$date<-as.Date(new_data$date)
+new_data$day_type<-ifelse(weekdays(new_data$date) %in% c("Saturday", "Sunday"), "weekend", "weekday")
+new_data <- aggregate(steps ~ interval + day_type, new_data, mean)
+xyplot(new_data$steps ~ new_data$interval|new_data$day_type, main="Daily Average by Interval",xlab="Interval", ylab="Steps",layout=c(1,2), type="l")
 
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+```
